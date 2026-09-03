@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rubik's Tic-Tac-Toe</title>
+  <script>(function(){var o=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(t,a){if(t==='webgl'||t==='webgl2'||t==='experimental-webgl')a=Object.assign({},a,{preserveDrawingBuffer:true});return o.call(this,t,a)}})();</script>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    window.useLocalStorage = function useLocalStorage(key, defaultValue) {
+      var React = window.React;
+      var stored = null;
+      try { stored = localStorage.getItem(key); } catch(e) {}
+      var _s = React.useState(
+        stored !== null
+          ? function() { try { return JSON.parse(stored); } catch(e) { return defaultValue; } }
+          : defaultValue
+      );
+      var value = _s[0]; var rawSet = _s[1];
+      var dirty = React.useRef(false);
+      var setValue = React.useCallback(function(v) { dirty.current = true; rawSet(v); }, []);
+      React.useEffect(function() {
+        if (!dirty.current) return;
+        dirty.current = false;
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) {}
+      }, [key, value]);
+      return [value, setValue];
+    };
+
+    window.useSynced = function useSynced(key, defaultValue) {
+      return window.useLocalStorage(key, defaultValue);
+    };
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="script.js"></script>
+</body>
+</html>

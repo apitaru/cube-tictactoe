@@ -22846,9 +22846,9 @@ void main() {
       requestAnimationFrame(animate);
     }, []);
     const rotateCubeToFace = $e((targetFace, onComplete) => {
-      const { cubeGroup } = threeRef.current;
+      const { cubeGroup, puck } = threeRef.current;
       if (!cubeGroup) {
-        onComplete?.();
+        onComplete?.(false);
         return;
       }
       const faceOrientations = {
@@ -22865,27 +22865,58 @@ void main() {
       let targetRotY = target.rotY;
       while (targetRotY - startRotY > Math.PI) targetRotY -= Math.PI * 2;
       while (targetRotY - startRotY < -Math.PI) targetRotY += Math.PI * 2;
+      const deltaX = target.rotX - startRotX;
+      const deltaY = targetRotY - startRotY;
+      const didRotate = Math.abs(deltaX) > 0.08 || Math.abs(deltaY) > 0.08;
+      if (!didRotate) {
+        cubeGroup.rotation.x = target.rotX;
+        cubeGroup.rotation.y = targetRotY;
+        cubeGroup.updateMatrixWorld(true);
+        onComplete?.(false);
+        return;
+      }
       const startTime = performance.now();
-      const duration = 320;
+      const duration = 380;
+      let startPuckPos = null;
+      let endPuckPos = null;
+      if (puck) {
+        const dirX = deltaY < 0 ? 1 : -1;
+        const dirY = deltaX > 0 ? 1 : -1;
+        startPuckPos = new C2(
+          Math.abs(deltaY) > 0.08 ? dirX * 2.3 : 0,
+          Math.abs(deltaX) > 0.08 ? dirY * 1.8 : 0,
+          2.6
+        );
+        endPuckPos = new C2(
+          Math.abs(deltaY) > 0.08 ? -dirX * 1.8 : 0,
+          Math.abs(deltaX) > 0.08 ? -dirY * 1.4 : 0,
+          2.6
+        );
+        puck.position.copy(startPuckPos);
+        puck.material.opacity = 1;
+      }
       const animate = (now) => {
         const p3 = Math.min(1, (now - startTime) / duration);
         const ease = 1 - Math.pow(1 - p3, 3);
-        cubeGroup.rotation.x = startRotX + (target.rotX - startRotX) * ease;
-        cubeGroup.rotation.y = startRotY + (targetRotY - startRotY) * ease;
+        cubeGroup.rotation.x = startRotX + deltaX * ease;
+        cubeGroup.rotation.y = startRotY + deltaY * ease;
+        if (puck && startPuckPos && endPuckPos) {
+          puck.position.lerpVectors(startPuckPos, endPuckPos, ease);
+        }
         if (p3 < 1) {
           requestAnimationFrame(animate);
         } else {
           cubeGroup.rotation.x = target.rotX;
           cubeGroup.rotation.y = targetRotY;
           cubeGroup.updateMatrixWorld(true);
-          onComplete?.();
+          onComplete?.(true);
         }
       };
       requestAnimationFrame(animate);
     }, []);
     const executeAiAnimatedTwist = $e(
       (axis, layerVal, angle, onComplete) => {
-        const { pivotGroup, cubeGroup, cubieMeshes } = threeRef.current;
+        const { pivotGroup, cubeGroup, cubieMeshes, puck, scene } = threeRef.current;
         if (!pivotGroup || !cubeGroup) {
           const next = simulateTwist(
             stateRef.current.cubiesState,
@@ -22897,43 +22928,83 @@ void main() {
           onComplete?.();
           return;
         }
-        threeRef.current.animating = true;
-        pivotGroup.rotation.set(0, 0, 0);
-        pivotGroup.position.set(0, 0, 0);
         const sliceMeshes = cubieMeshes.filter((m2) => {
           const p3 = m2.position.clone();
           return Math.round(p3[axis] / 1.02) === layerVal;
         });
-        sliceMeshes.forEach((m2) => pivotGroup.attach(m2));
-        const startTime = performance.now();
-        const duration = 250;
-        const animate = (now) => {
-          const p3 = Math.min(1, (now - startTime) / duration);
-          const ease = 1 - Math.pow(1 - p3, 3);
-          pivotGroup.rotation[axis] = angle * ease;
-          if (p3 < 1) {
-            requestAnimationFrame(animate);
-          } else {
-            pivotGroup.rotation[axis] = angle;
-            pivotGroup.updateMatrixWorld(true);
-            sliceMeshes.forEach((m2) => cubeGroup.attach(m2));
-            pivotGroup.rotation.set(0, 0, 0);
-            threeRef.current.animating = false;
-            const next = simulateTwist(
-              stateRef.current.cubiesState,
-              axis,
-              layerVal,
-              angle
-            );
-            setCubiesState(next);
-            const dir = angle > 0 ? "+90\xB0" : "-90\xB0";
-            setLastActionToast(`Twisted ${axis.toUpperCase()} layer (${dir})`);
-            onComplete?.();
+
+        const startRotation = () => {
+          threeRef.current.animating = true;
+          pivotGroup.rotation.set(0, 0, 0);
+          pivotGroup.position.set(0, 0, 0);
+          sliceMeshes.forEach((m2) => pivotGroup.attach(m2));
+          if (puck) {
+            pivotGroup.attach(puck);
           }
+          const startTime = performance.now();
+          const duration = 280;
+          const animate = (now) => {
+            const p3 = Math.min(1, (now - startTime) / duration);
+            const ease = 1 - Math.pow(1 - p3, 3);
+            pivotGroup.rotation[axis] = angle * ease;
+            if (p3 < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              pivotGroup.rotation[axis] = angle;
+              pivotGroup.updateMatrixWorld(true);
+              sliceMeshes.forEach((m2) => cubeGroup.attach(m2));
+              if (puck && scene) {
+                scene.attach(puck);
+              }
+              pivotGroup.rotation.set(0, 0, 0);
+              threeRef.current.animating = false;
+              const next = simulateTwist(
+                stateRef.current.cubiesState,
+                axis,
+                layerVal,
+                angle
+              );
+              setCubiesState(next);
+              const dir = angle > 0 ? "+90\xB0" : "-90\xB0";
+              setLastActionToast(`Twisted ${axis.toUpperCase()} layer (${dir})`);
+              setTimeout(() => {
+                if (threeRef.current.puck) {
+                  threeRef.current.puck.material.opacity = 0;
+                }
+              }, 200);
+              onComplete?.();
+            }
+          };
+          requestAnimationFrame(animate);
         };
-        requestAnimationFrame(animate);
+
+        if (puck && sliceMeshes.length > 0) {
+          let bestMesh = sliceMeshes[0];
+          let maxZ = -Infinity;
+          const tempP = new C2();
+          sliceMeshes.forEach((m2) => {
+            m2.getWorldPosition(tempP);
+            if (tempP.z > maxZ) {
+              maxZ = tempP.z;
+              bestMesh = m2;
+            }
+          });
+          const cubieWorldPos = new C2();
+          bestMesh.getWorldPosition(cubieWorldPos);
+          const cubeCenter = new C2();
+          cubeGroup.getWorldPosition(cubeCenter);
+          const outward = cubieWorldPos.clone().sub(cubeCenter).normalize();
+          const targetWorldPos = cubieWorldPos.clone().add(outward.clone().multiplyScalar(0.72));
+          puck.position.copy(targetWorldPos).add(outward.clone().multiplyScalar(0.4));
+          puck.material.opacity = 1;
+          animatePuckToPos(targetWorldPos, () => {
+            startRotation();
+          });
+        } else {
+          startRotation();
+        }
       },
-      [setCubiesState]
+      [setCubiesState, animatePuckToPos]
     );
     Ue(() => {
       if (opponentMode === "none" || xIsNext || overallWinner) return;
@@ -22976,7 +23047,7 @@ void main() {
               else if (localCubeDir.z < -0.5) currentFacing = "B";
             }
           }
-          rotateCubeToFace(currentFacing, () => {
+          rotateCubeToFace(currentFacing, (didRotate) => {
             requestAnimationFrame(() => {
               const freshMesh = threeRef.current.cubieMeshes.find(
                 (m2) => m2.userData.id === decision.cubieId
@@ -22994,7 +23065,7 @@ void main() {
                 normal.copy(sideDef.vec).applyQuaternion(worldQuaternion).normalize();
                 worldPos.add(normal.multiplyScalar(0.78));
                 const { puck } = threeRef.current;
-                if (puck) {
+                if (puck && !didRotate) {
                   puck.position.copy(worldPos).add(normal.clone().multiplyScalar(0.4));
                 }
                 animatePuckToPos(worldPos, () => {

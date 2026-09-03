@@ -23915,7 +23915,7 @@ void main() {
             className: "group/putty-host pointer-events-auto flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/60 hover:bg-zinc-900/90 border border-zinc-800/60 hover:border-zinc-700/80 backdrop-blur-md transition-all text-[11px] text-zinc-400 hover:text-zinc-100 shadow-sm",
             "aria-label": "Play with Putty home",
             children: [
-              /* @__PURE__ */ q3("span", { children: "Made by @pitaru and his kid using" }),
+              /* @__PURE__ */ q3("span", { children: "Made by @pitaru using" }),
               /* @__PURE__ */ C("div", { className: "flex items-center gap-1.5 font-medium text-zinc-300 group-hover/putty-host:text-zinc-100", children: [
                 /* @__PURE__ */ q3(
                   "div",
